@@ -8,7 +8,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_BASE_URL = 'https://simple-web-app-alb-32739058.us-east-1.elb.amazonaws.com';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://simple-web-app-alb-1390258519.us-east-1.elb.amazonaws.com';
 
   const fetchData = async () => {
     setLoading(true);

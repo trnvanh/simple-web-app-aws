@@ -193,19 +193,15 @@ resource "tls_self_signed_cert" "alb" {
   ]
 }
 
-# HTTP Listener (redirect to HTTPS)
+# HTTP Listener (forward to backend)
 resource "aws_lb_listener" "backend_http" {
   load_balancer_arn = aws_lb.main.arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
   }
 }
 
