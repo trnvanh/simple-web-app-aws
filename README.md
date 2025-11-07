@@ -30,7 +30,7 @@ A modern full-stack web application demonstrating cloud-native architecture with
 ### Option 1: Local Development
 ```bash
 # Clone and run locally
-git clone <repository>
+git clone https://github.com/trnvanh/simple-web-app-aws.git
 cd simple_web_app
 docker-compose up --build
 
