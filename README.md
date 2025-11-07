@@ -43,7 +43,9 @@ docker-compose up --build
 ```bash
 # Deploy infrastructure
 cd iac
-terraform init && terraform apply
+terraform init
+terraform plan
+terraform apply -auto-approve
 
 # Deploy application (automated via Terraform)
 ```
@@ -87,14 +89,14 @@ terraform apply -auto-approve
 ECR_REPO=$(terraform output -raw ecr_repository_url)
 ECR_REGISTRY=$(echo $ECR_REPO | cut -d'/' -f1)
 
-# Build and push backend
-cd ../backend
-docker build --platform linux/amd64 -t simple-web-app-backend .
-docker tag simple-web-app-backend:latest $ECR_REPO:latest
-
 # Login to ECR
+cd ../backend
 aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin $ECR_REGISTRY
+
+# Build and push backend
+docker build --platform linux/amd64 -t simple-web-app-backend .
+docker tag simple-web-app-backend:latest $ECR_REPO:latest
 
 # Push image
 docker push $ECR_REPO:latest
@@ -110,8 +112,10 @@ aws ecs update-service \
 ### 3. Deploy Frontend
 ```bash
 cd ../frontend
+VITE_API_BASE_URL=https://simple-web-app-alb-1390258519.us-east-1.elb.amazonaws.com
 
 # Build and upload to S3
+npm install
 npm run build
 S3_BUCKET=$(cd ../iac && terraform output -raw s3_bucket_name)
 aws s3 sync dist/ s3://$S3_BUCKET --delete
@@ -119,6 +123,11 @@ aws s3 sync dist/ s3://$S3_BUCKET --delete
 # Invalidate CloudFront cache
 DISTRIBUTION_ID=$(cd ../iac && terraform output -raw cloudfront_distribution_id)
 aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+
+# Test backend endpoints
+# For example
+curl -k https://simple-web-app-alb-1390258519.us-east-1.elb.amazonaws.com/health
+curl -k https://simple-web-app-alb-1390258519.us-east-1.elb.amazonaws.com/hello
 ```
 
 ### 4. Access Your Application
@@ -128,6 +137,9 @@ cd iac
 echo "Frontend: $(terraform output -raw frontend_url)"
 echo "Backend:  $(terraform output -raw backend_api_url)"
 ```
+
+### 5. Check backend deployment status
+aws ecs describe-services --cluster simple-web-app-cluster --services simple-web-app-backend-service --query "services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}"
 
 ## Project Structure
 
