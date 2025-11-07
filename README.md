@@ -130,7 +130,7 @@ curl -k https://simple-web-app-alb-1390258519.us-east-1.elb.amazonaws.com/health
 curl -k https://simple-web-app-alb-1390258519.us-east-1.elb.amazonaws.com/hello
 ```
 
-### 4. Access Your Application
+### 4. Access Application
 ```bash
 # Get application URLs
 cd iac
@@ -138,8 +138,10 @@ echo "Frontend: $(terraform output -raw frontend_url)"
 echo "Backend:  $(terraform output -raw backend_api_url)"
 ```
 
-### 5. Check backend deployment status
+### 5. Check Backend Deployment Status
+```bash
 aws ecs describe-services --cluster simple-web-app-cluster --services simple-web-app-backend-service --query "services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}"
+```
 
 ## Project Structure
 
