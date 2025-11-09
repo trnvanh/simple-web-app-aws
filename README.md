@@ -92,11 +92,11 @@ terraform apply -auto-approve
 
 ## Prerequisites
 
-**For Local Development:**
+**For local development:**
 - Docker Desktop
 - Docker Compose
 
-**For AWS Deployment:**
+**For AWS deployment:**
 - AWS Account (Free Tier eligible)
 - AWS CLI configured
 - Terraform >= 1.0
@@ -258,28 +258,82 @@ aws s3 ls | grep simple-web-app
 ## Limitations and Non-Idealities
 
 ### Missing parts
+Due to limited time and scope, this implementation is missing several important features that would be expected in a production-ready application.
 
-**Due to limited time and scope, this implementation is missing several important features that would be expected in a production-ready application.** 
-The Application Load Balancer currently uses HTTP on port 80 instead of HTTPS on port 443, which means all **API traffic is transmitted unencrypted and potentially exposes sensitive data.** To add SSL/TLS support, AWS Certificate Manager can be used.
+- No HTTPS:
 
-**The backend API lacks explicit CORS configuration,** which could lead to cross-origin request blocking issues when the frontend attempts to communicate with the API in production environments. Although the current setup works because both the frontend and backend are deployed within the same AWS account, this is not a best practice. 
+  - ALB uses HTTP (port 80) instead of HTTPS (port 443).
 
-Instead of using a custom domain name, the application relies on **default AWS-generated URLs for both the CloudFront distribution and the Application Load Balancer.** A production application would typically use custom domains like `https://myapp.com` for the frontend and `https://api.myapp.com` for the backend. To implement this, we can register a domain through Route 53, create a hosted zone, and update both the CloudFront distribution and ALB configurations to use the custom domains with SSL certificates.
+  - API traffic is unencrypted; SSL/TLS should be added via AWS Certificate Manager.
 
-There is **no automated CI/CD pipeline** in place, which means all deployments must be performed manually using commands like `docker build`, `docker push`, and `aws s3 sync`. This manual process is time-consuming, error-prone, and makes it difficult to maintain consistent deployment practices across team members. A proper CI/CD solution would automate the entire deployment workflow, including building the application, running tests, pushing container images to ECR, updating the ECS service, syncing frontend assets to S3, and invalidating the CloudFront cache.
+- No CORS configuration:
 
-Finally, **the application lacks any form of persistent data storage.** The backend API currently returns only static, hardcoded data because there is no database integration. For a real application, we can add either Amazon RDS for relational data or DynamoDB for NoSQL data, update the backend code to connect to the database, and store database credentials securely using AWS Secrets Manager. 
+  - Backend lacks explicit CORS setup.
+
+  - Works for now since frontend and backend are in the same AWS account, but not best practice for production.
+
+- No custom domains:
+
+  - Uses default AWS-generated URLs for CloudFront and ALB.
+
+  - Production apps should use domains like myapp.com and api.myapp.com.
+
+  - Requires Route 53 domain registration, hosted zone, ALB & CloudFront updates, and SSL certificates.
+
+- No CI/CD pipeline:
+
+  - Deployments are fully manual (docker build, docker push, s3 sync, etc.).
+
+  - Manual workflow is slow, error-prone, and inconsistent.
+
+  - CI/CD should automate builds, tests, ECR pushes, ECS updates, S3 sync, CloudFront invalidation.
+
+- No persistent storage:
+
+  - Backend uses static/hardcoded data.
+
+  - Needs integration with RDS or DynamoDB, backend DB logic, and secure credentials via Secrets Manager.
 
 ### Non-Idealities
 
-There are several aspects of the current implementation that could be improved. **The Application Load Balancer represents a significant fixed cost of approximately $20 per month regardless of how much traffic the application receives.** For applications with low traffic volumes, a serverless architecture using API Gateway and Lambda would be more cost-effective, though the ALB does provide better performance and simpler configuration for containerized applications.
+There are several aspects of the current implementation that could be improved. 
 
-**The security configuration needs improvement in several areas.** The ALB security group currently allows inbound HTTP traffic from any IP address (0.0.0.0/0), which is overly permissive and could be restricted to CloudFront IP ranges or protected by AWS WAF. There is no secrets management system in place for storing sensitive information like API keys or database passwords, and container images are not being scanned for vulnerabilities. 
+- High fixed ALB cost:
 
-The current deployment runs only a single ECS task with no auto-scaling configured, which creates a single point of failure and provides no redundancy. **The application cannot automatically scale in response to increased load,** and if the single container fails, the entire backend becomes unavailable. To improve scalability, ECS auto-scaling policies can be configured based on CPU utilization, memory usage, or request count, and run multiple tasks across different availability zones for redundancy.
+  - ALB costs ~$20/month regardless of traffic.
 
-**The deployment strategy is problematic because it uses the basic `force-new-deployment` command, which stops the old container before starting the new one, causing a brief period of downtime during each deployment.** A better approach would be to use blue-green or rolling deployments that maintain service availability throughout the update process.
+  - Low-traffic apps could be cheaper on API Gateway + Lambda, though ALB works well for containers.
 
-The frontend build process requires **the `VITE_API_BASE_URL` environment variable to be hardcoded at build time**, which means you need to rebuild the entire frontend whenever you want to deploy to a different environment (development, staging, or production). 
+- Weak security configuration:
 
-Lastly, **the Terraform state is stored locally on disk, which creates risks of state file loss and conflicts when multiple developers work on the infrastructure**. If two developers try to apply changes simultaneously, they could corrupt the state file. Production environments should use a remote backend with state locking, which can be implemented using an S3 bucket for storage and a DynamoDB table for locking coordination.
+  - ALB SG allows HTTP from anywhere (0.0.0.0/0).
+
+  - Should restrict to CloudFront IP ranges or use AWS WAF.
+
+  - No secrets management or container vulnerability scanning.
+
+- Single ECS task / no scaling:
+
+  - Only one ECS task running may lead to single point of failure.
+
+  - No auto-scaling on CPU/memory/requests.
+
+  - Should run multiple tasks across AZs for redundancy.
+
+- Downtime during deployments:
+
+  - Uses force-new-deployment which stops old container before starting the new one.
+
+  - Should use blue-green or rolling deployments for zero-downtime updates.
+
+- Frontend environment variable limitation:
+
+  - VITE_API_BASE_URL must be hardcoded at build time.
+
+  - Requires rebuilding the frontend for each environment (dev/stage/prod).
+
+- Local Terraform state:
+
+  - State stored on disk having risk of corruption, loss, and conflicts.
+
+  - Production should use remote backend with state locking (S3 + DynamoDB).
